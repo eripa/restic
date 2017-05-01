@@ -31,11 +31,6 @@ type beSwift struct {
 func Open(cfg Config) (restic.Backend, error) {
 	debug.Log("config %#v", cfg)
 
-	tr := debug.RoundTripper(&http.Transport{
-		Proxy:               http.ProxyFromEnvironment,
-		MaxIdleConnsPerHost: 2048,
-	})
-
 	be := &beSwift{
 		conn: &swift.Connection{
 			UserName:       cfg.UserName,
@@ -52,7 +47,7 @@ func Open(cfg Config) (restic.Backend, error) {
 			ConnectTimeout: time.Minute,
 			Timeout:        time.Minute,
 
-			Transport: tr,
+			Transport: backend.Transport(),
 		},
 		container: cfg.Container,
 		prefix:    cfg.Prefix,
