@@ -1,6 +1,7 @@
 package swift
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"path"
@@ -45,6 +46,8 @@ func Open(cfg Config) (restic.Backend, error) {
 			AuthToken:      cfg.AuthToken,
 			ConnectTimeout: time.Minute,
 			Timeout:        time.Minute,
+
+			Transport: debug.RoundTripper(nil),
 		},
 		container: cfg.Container,
 		prefix:    cfg.Prefix,
@@ -75,6 +78,16 @@ func Open(cfg Config) (restic.Backend, error) {
 
 	default:
 		return nil, errors.Wrap(err, "conn.Container")
+	}
+
+	// check that the server supports byte ranges
+	_, hdr, err := be.conn.Account()
+	if err != nil {
+		return nil, errors.Wrap(err, "Account()")
+	}
+
+	if hdr["Accept-Ranges"] != "bytes" {
+		return nil, errors.New("backend does not support byte range")
 	}
 
 	return be, nil
@@ -127,42 +140,22 @@ func (be *beSwift) Load(h restic.Handle, length int, offset int64) (io.ReadClose
 		be.connChan <- struct{}{}
 	}()
 
-	obj, _, err := be.conn.ObjectOpen(be.container, objName, false, nil)
+	headers := swift.Headers{}
+	if offset > 0 && length > 0 {
+		headers["Range"] = fmt.Sprintf("bytes=%d-", offset)
+		if length > 0 {
+			headers["Range"] = fmt.Sprintf("bytes=%d-%d", offset, offset+int64(length)-1)
+		}
+		debug.Log("Load(%v) send range %v", h, headers["Range"])
+	}
+
+	obj, _, err := be.conn.ObjectOpen(be.container, objName, false, headers)
 	if err != nil {
 		debug.Log("  err %v", err)
 		return nil, errors.Wrap(err, "conn.ObjectOpen")
 	}
 
-	// if we're going to read the whole object, just pass it on.
-	if length == 0 {
-		debug.Log("Load %v: pass on object", h)
-		_, err = obj.Seek(offset, 0)
-		if err != nil {
-			_ = obj.Close()
-			return nil, errors.Wrap(err, "obj.Seek")
-		}
-
-		return obj, nil
-	}
-
-	// otherwise pass a LimitReader
-	size, err := obj.Length()
-	if err != nil {
-		return nil, errors.Wrap(err, "obj.Length")
-	}
-
-	if offset > size {
-		_ = obj.Close()
-		return nil, errors.Errorf("offset larger than file size")
-	}
-
-	_, err = obj.Seek(offset, 0)
-	if err != nil {
-		_ = obj.Close()
-		return nil, errors.Wrap(err, "obj.Seek")
-	}
-
-	return backend.LimitReadCloser(obj, int64(length)), nil
+	return obj, nil
 }
 
 // Save stores data in the backend at the handle.
