@@ -13,19 +13,24 @@ var configTests = []struct {
 	{"swift:cnt5:/prefix#params", Config{Container: "cnt5", Prefix: "prefix"}},
 }
 
-func TestParseConfigInternal(t *testing.T) {
-	for i, test := range configTests {
-		cfg, err := ParseConfig(test.s)
-		if err != nil {
-			t.Errorf("test %d:%s failed: %v", i, test.s, err)
-			continue
-		}
+func TestParseConfig(t *testing.T) {
+	for _, test := range configTests {
+		t.Run("", func(t *testing.T) {
+			v, err := ParseConfig(test.s)
+			if err != nil {
+				t.Fatalf("parsing %q failed: %v", test.s, err)
+			}
 
-		if cfg != test.cfg {
-			t.Errorf("test %d:\ninput:\n  %s\n wrong config, want:\n  %v\ngot:\n  %v",
-				i, test.s, test.cfg, cfg)
-			continue
-		}
+			cfg, ok := v.(Config)
+			if !ok {
+				t.Fatalf("wrong type returned, want Config, got %T", cfg)
+			}
+
+			if cfg != test.cfg {
+				t.Fatalf("wrong output for %q, want:\n  %#v\ngot:\n  %#v",
+					test.s, test.cfg, cfg)
+			}
+		})
 	}
 }
 
