@@ -31,6 +31,11 @@ type beSwift struct {
 func Open(cfg Config) (restic.Backend, error) {
 	debug.Log("config %#v", cfg)
 
+	tr := debug.RoundTripper(&http.Transport{
+		Proxy:               http.ProxyFromEnvironment,
+		MaxIdleConnsPerHost: 2048,
+	})
+
 	be := &beSwift{
 		conn: &swift.Connection{
 			UserName:       cfg.UserName,
@@ -47,7 +52,7 @@ func Open(cfg Config) (restic.Backend, error) {
 			ConnectTimeout: time.Minute,
 			Timeout:        time.Minute,
 
-			Transport: debug.RoundTripper(nil),
+			Transport: tr,
 		},
 		container: cfg.Container,
 		prefix:    cfg.Prefix,
@@ -141,11 +146,15 @@ func (be *beSwift) Load(h restic.Handle, length int, offset int64) (io.ReadClose
 	}()
 
 	headers := swift.Headers{}
-	if offset > 0 && length > 0 {
+	if offset > 0 {
 		headers["Range"] = fmt.Sprintf("bytes=%d-", offset)
-		if length > 0 {
-			headers["Range"] = fmt.Sprintf("bytes=%d-%d", offset, offset+int64(length)-1)
-		}
+	}
+
+	if length > 0 {
+		headers["Range"] = fmt.Sprintf("bytes=%d-%d", offset, offset+int64(length)-1)
+	}
+
+	if _, ok := headers["Range"]; ok {
 		debug.Log("Load(%v) send range %v", h, headers["Range"])
 	}
 
