@@ -51,7 +51,7 @@ func Open(cfg Config) (restic.Backend, error) {
 		},
 		container: cfg.Container,
 		prefix:    cfg.Prefix,
-		Layout: &backend.CloudLayout{
+		Layout: &backend.DefaultLayout{
 			Path: cfg.Prefix,
 			Join: path.Join,
 		},
