@@ -12,6 +12,10 @@ Small changes:
    reporting the current status by sending a `USR1` signal to the process.
    https://github.com/restic/restic/pull/974
 
+ * New Swift backend: The Swift cloud storage backend has been added.
+   https://github.com/restic/restic/pull/975
+   https://github.com/restic/restic/pull/648
+
 Important Changes in 0.6.0
 ==========================
 
