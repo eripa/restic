@@ -27,7 +27,7 @@ func newSwiftTestSuite(t testing.TB) *test.Suite {
 			}
 
 			cfg := swiftcfg.(swift.Config)
-			if err = swift.ApplyEnvironment(&cfg); err != nil {
+			if err = swift.ApplyEnvironment("RESTIC_TEST_", &cfg); err != nil {
 				return nil, err
 			}
 			cfg.Prefix += fmt.Sprintf("/test-%d", time.Now().UnixNano())

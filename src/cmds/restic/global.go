@@ -360,7 +360,7 @@ func parseConfig(loc location.Location, opts options.Options) (interface{}, erro
 	case "swift":
 		cfg := loc.Config.(swift.Config)
 
-		if err := swift.ApplyEnvironment(&cfg); err != nil {
+		if err := swift.ApplyEnvironment("", &cfg); err != nil {
 			return nil, err
 		}
 
