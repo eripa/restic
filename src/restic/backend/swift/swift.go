@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"path"
+	"path/filepath"
 	"restic"
 	"restic/backend"
 	"restic/debug"
@@ -256,7 +257,7 @@ func (be *beSwift) List(t restic.FileType, done <-chan struct{}) <-chan string {
 					return nil, errors.Wrap(err, "conn.ObjectNames")
 				}
 				for _, obj := range newObjects {
-					m := strings.TrimPrefix(obj, prefix)
+					m := filepath.Base(strings.TrimPrefix(obj, prefix))
 					if m == "" {
 						continue
 					}
