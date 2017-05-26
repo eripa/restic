@@ -2,105 +2,106 @@ package swift_test
 
 import (
 	"fmt"
-	"math/rand"
 	"os"
 	"restic"
+	"testing"
 	"time"
 
-	"restic/debug"
 	"restic/errors"
+	. "restic/test"
 
 	"restic/backend/swift"
 	"restic/backend/test"
 )
 
-//go:generate go run ../test/generate_backend_tests.go
+func newSwiftTestSuite(t testing.TB) *test.Suite {
+	return &test.Suite{
+		// do not use excessive data
+		MinimalData: true,
 
-func init() {
-	// only use minimal data
-	test.MinimalData = true
+		// NewConfig returns a config for a new temporary backend that will be used in tests.
+		NewConfig: func() (interface{}, error) {
+			swiftcfg, err := swift.ParseConfig(os.Getenv("RESTIC_TEST_SWIFT"))
+			if err != nil {
+				return nil, err
+			}
 
-	cfg := swift.Config{}
+			cfg := swiftcfg.(swift.Config)
+			if err = swift.ApplyEnvironment(&cfg); err != nil {
+				return nil, err
+			}
+			cfg.Prefix += fmt.Sprintf("/test-%d", time.Now().UnixNano())
+			t.Logf("using prefix %v", cfg.Prefix)
+			return cfg, nil
+		},
 
-	for _, val := range []struct {
-		s   *string
-		env string
-	}{
-		// v2/v3 specific
-		{&cfg.UserName, "OS_USERNAME"},
-		{&cfg.APIKey, "OS_PASSWORD"},
-		{&cfg.Region, "OS_REGION_NAME"},
-		{&cfg.AuthURL, "OS_AUTH_URL"},
+		// CreateFn is a function that creates a temporary repository for the tests.
+		Create: func(config interface{}) (restic.Backend, error) {
+			cfg := config.(swift.Config)
 
-		// v3 specific
-		{&cfg.Domain, "OS_USER_DOMAIN_NAME"},
-		{&cfg.Tenant, "OS_PROJECT_NAME"},
-		{&cfg.TenantDomain, "OS_PROJECT_DOMAIN_NAME"},
+			be, err := swift.Open(cfg)
+			if err != nil {
+				return nil, err
+			}
 
-		// v2 specific
-		{&cfg.TenantID, "OS_TENANT_ID"},
-		{&cfg.Tenant, "OS_TENANT_NAME"},
+			exists, err := be.Test(restic.Handle{Type: restic.ConfigFile})
+			if err != nil {
+				return nil, err
+			}
 
-		// v1 specific
-		{&cfg.AuthURL, "ST_AUTH"},
-		{&cfg.UserName, "ST_USER"},
-		{&cfg.APIKey, "ST_KEY"},
+			if exists {
+				return nil, errors.New("config already exists")
+			}
 
-		// Manual authentication
-		{&cfg.StorageURL, "OS_STORAGE_URL"},
-		{&cfg.AuthToken, "OS_AUTH_TOKEN"},
+			return be, nil
+		},
 
-		{&cfg.DefaultContainerPolicy, "SWIFT_DEFAULT_CONTAINER_POLICY"},
-	} {
-		if *val.s == "" {
-			*val.s = os.Getenv(val.env)
-		}
+		// OpenFn is a function that opens a previously created temporary repository.
+		Open: func(config interface{}) (restic.Backend, error) {
+			cfg := config.(swift.Config)
+			return swift.Open(cfg)
+		},
+
+		// CleanupFn removes data created during the tests.
+		Cleanup: func(config interface{}) error {
+			cfg := config.(swift.Config)
+
+			be, err := swift.Open(cfg)
+			if err != nil {
+				return err
+			}
+
+			if err := be.(restic.Deleter).Delete(); err != nil {
+				return err
+			}
+
+			return nil
+		},
 	}
+}
 
-	cfg.Container = os.Getenv("RESTIC_TEST_SWIFT_CONTAINER")
-	if cfg.Container == "" {
-		SkipMessage = "RESTIC_TEST_SWIFT_CONTAINER unset, skipping test"
+func TestBackendSwift(t *testing.T) {
+	defer func() {
+		if t.Skipped() {
+			SkipDisallowed(t, "restic/backend/swift.TestBackendSwift")
+		}
+	}()
+
+	if os.Getenv("RESTIC_TEST_SWIFT") == "" {
+		t.Skip("RESTIC_TEST_SWIFT unset, skipping test")
 		return
 	}
 
-	// use a unique prefix
-	rand.Seed(time.Now().UnixNano())
-	cfg.Prefix = fmt.Sprintf("travis-%s-%d", os.Getenv("TRAVIS_BUILD_ID"), rand.Int63())
+	t.Logf("run tests")
+	newSwiftTestSuite(t).RunTests(t)
+}
 
-	debug.Log("opening swift repository at %#v", cfg)
-
-	test.CreateFn = func() (restic.Backend, error) {
-		be, err := swift.Open(cfg)
-		if err != nil {
-			return nil, err
-		}
-
-		exists, err := be.Test(restic.Handle{Type: restic.ConfigFile})
-		if err != nil {
-			return nil, err
-		}
-
-		if exists {
-			return nil, errors.New("config already exists")
-		}
-
-		return be, nil
+func BenchmarkBackendSwift(t *testing.B) {
+	if os.Getenv("RESTIC_TEST_SWIFT") == "" {
+		t.Skip("RESTIC_TEST_SWIFT unset, skipping test")
+		return
 	}
 
-	test.OpenFn = func() (restic.Backend, error) {
-		return swift.Open(cfg)
-	}
-
-	test.CleanupFn = func() error {
-		type deleter interface {
-			Delete() error
-		}
-
-		be, err := swift.Open(cfg)
-		if err != nil {
-			return err
-		}
-
-		return be.(deleter).Delete()
-	}
+	t.Logf("run tests")
+	newSwiftTestSuite(t).RunBenchmarks(t)
 }
