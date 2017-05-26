@@ -12,7 +12,8 @@ Small changes:
    reporting the current status by sending a `USR1` signal to the process.
    https://github.com/restic/restic/pull/974
 
- * New Swift backend: The Swift cloud storage backend has been added.
+ * New "swift" backend: A new backend for the OpenStack Swift cloud storage
+   protocol has been added, https://wiki.openstack.org/wiki/Swift
    https://github.com/restic/restic/pull/975
    https://github.com/restic/restic/pull/648
 
