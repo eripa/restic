@@ -32,6 +32,12 @@
 			"branch": "master"
 		},
 		{
+			"importpath": "github.com/kurin/blazer",
+			"repository": "https://github.com/kurin/blazer",
+			"revision": "5be2abe1645e27bdfc83d6c27a9c6bfcd28aa832",
+			"branch": "master"
+		},
+		{
 			"importpath": "github.com/minio/go-homedir",
 			"repository": "https://github.com/minio/go-homedir",
 			"revision": "0b1069c753c94b3633cc06a1995252dbcc27c7a6",
