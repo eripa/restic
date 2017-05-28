@@ -146,19 +146,6 @@ func (be *b2Backend) Load(h restic.Handle, length int, offset int64) (io.ReadClo
 	name := be.Layout.Filename(h)
 	obj := be.bucket.Object(name)
 
-	// Ensure object attributes are loaded and status is uploaded.
-	info, err := obj.Attrs(ctx)
-	if err != nil || info == nil || info.Status != b2.Uploaded {
-		cancel()
-		return nil, errors.Wrap(err, "obj.Attrs")
-	}
-
-	// return an error if the offset is beyond the end of the file
-	if offset > info.Size {
-		cancel()
-		return nil, errors.New("offset beyond end of file")
-	}
-
 	if offset == 0 && length == 0 {
 		rd := obj.NewReader(ctx)
 		wrapper := &wrapReader{
@@ -214,7 +201,7 @@ func (be *b2Backend) Save(h restic.Handle, rd io.Reader) (err error) {
 }
 
 // Stat returns information about a blob.
-func (be b2Backend) Stat(h restic.Handle) (bi restic.FileInfo, err error) {
+func (be *b2Backend) Stat(h restic.Handle) (bi restic.FileInfo, err error) {
 	debug.Log("Stat %v", h)
 
 	ctx, cancel := context.WithCancel(context.TODO())
