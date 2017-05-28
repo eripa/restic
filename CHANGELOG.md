@@ -12,6 +12,11 @@ Small changes:
    reporting the current status by sending a `USR1` signal to the process.
    https://github.com/restic/restic/pull/974
 
+ * New "b2" backend: A new backend for Backblaze B2 cloud storage
+   service has been added, https://www.backblaze.com
+   https://github.com/restic/restic/issues/512
+   https://github.com/restic/restic/pull/978
+
  * The `build.go` now strips the temporary directory used for compilation from
    the binary. This is the first step in enabling reproducible builds.
    https://github.com/restic/restic/pull/981
