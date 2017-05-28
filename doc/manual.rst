@@ -299,10 +299,10 @@ bucket does not exist yet, it will be created:
 
 .. code-block:: console
 
-    $ restic -r b2:bucket_name:path/to/repo init
+    $ restic -r b2:bucketname:path/to/repo init
     enter password for new backend:
     enter password again:
-    created restic backend eefee03bbd at b2:bucket_name
+    created restic backend eefee03bbd at b2:bucketname:path/to/repo
     Please note that knowledge of your password is required to access the repository.
     Losing your password means that your data is irrecoverably lost.
 
