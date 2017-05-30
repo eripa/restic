@@ -207,16 +207,18 @@ var parseTests = []struct {
 	{
 		"b2:bucketname:/prefix", Location{Scheme: "b2",
 			Config: b2.Config{
-				Bucket: "bucketname",
-				Prefix: "prefix",
+				Bucket:      "bucketname",
+				Prefix:      "prefix",
+				Connections: 5,
 			},
 		},
 	},
 	{
 		"b2:bucketname", Location{Scheme: "b2",
 			Config: b2.Config{
-				Bucket: "bucketname",
-				Prefix: "",
+				Bucket:      "bucketname",
+				Prefix:      "",
+				Connections: 5,
 			},
 		},
 	},

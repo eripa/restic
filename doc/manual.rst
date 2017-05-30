@@ -306,6 +306,10 @@ bucket does not exist yet, it will be created:
     Please note that knowledge of your password is required to access the repository.
     Losing your password means that your data is irrecoverably lost.
 
+The number of concurrent connections to the B2 service can be set with the `-o
+b2.connections=10`. By default, at most five parallel connections are
+established.
+
 
 Password prompt on Windows
 ~~~~~~~~~~~~~~~~~~~~~~~~~~

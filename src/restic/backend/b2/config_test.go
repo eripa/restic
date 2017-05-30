@@ -7,28 +7,34 @@ var configTests = []struct {
 	cfg Config
 }{
 	{"b2:bucketname", Config{
-		Bucket: "bucketname",
-		Prefix: "",
+		Bucket:      "bucketname",
+		Prefix:      "",
+		Connections: 5,
 	}},
 	{"b2:bucketname:", Config{
-		Bucket: "bucketname",
-		Prefix: "",
+		Bucket:      "bucketname",
+		Prefix:      "",
+		Connections: 5,
 	}},
 	{"b2:bucketname:/prefix/directory", Config{
-		Bucket: "bucketname",
-		Prefix: "prefix/directory",
+		Bucket:      "bucketname",
+		Prefix:      "prefix/directory",
+		Connections: 5,
 	}},
 	{"b2:foobar", Config{
-		Bucket: "foobar",
-		Prefix: "",
+		Bucket:      "foobar",
+		Prefix:      "",
+		Connections: 5,
 	}},
 	{"b2:foobar:", Config{
-		Bucket: "foobar",
-		Prefix: "",
+		Bucket:      "foobar",
+		Prefix:      "",
+		Connections: 5,
 	}},
 	{"b2:foobar:/", Config{
-		Bucket: "foobar",
-		Prefix: "",
+		Bucket:      "foobar",
+		Prefix:      "",
+		Connections: 5,
 	}},
 }
 

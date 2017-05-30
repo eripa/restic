@@ -20,6 +20,7 @@ type b2Backend struct {
 	bucket *b2.Bucket
 	cfg    Config
 	backend.Layout
+	sem *backend.Semaphore
 }
 
 // Open opens a connection to the B2 service.
@@ -47,6 +48,7 @@ func Open(cfg Config) (restic.Backend, error) {
 			Join: path.Join,
 			Path: cfg.Prefix,
 		},
+		sem: backend.NewSemaphore(cfg.Connections),
 	}
 
 	return be, nil
@@ -81,6 +83,7 @@ func Create(cfg Config) (restic.Backend, error) {
 			Join: path.Join,
 			Path: cfg.Prefix,
 		},
+		sem: backend.NewSemaphore(cfg.Connections),
 	}
 
 	present, err := be.Test(restic.Handle{Type: restic.ConfigFile})
@@ -143,6 +146,8 @@ func (be *b2Backend) Load(h restic.Handle, length int, offset int64) (io.ReadClo
 
 	ctx, cancel := context.WithCancel(context.TODO())
 
+	be.sem.GetToken()
+
 	name := be.Layout.Filename(h)
 	obj := be.bucket.Object(name)
 
@@ -150,7 +155,10 @@ func (be *b2Backend) Load(h restic.Handle, length int, offset int64) (io.ReadClo
 		rd := obj.NewReader(ctx)
 		wrapper := &wrapReader{
 			ReadCloser: rd,
-			f:          cancel,
+			f: func() {
+				cancel()
+				be.sem.ReleaseToken()
+			},
 		}
 		return wrapper, nil
 	}
@@ -164,7 +172,10 @@ func (be *b2Backend) Load(h restic.Handle, length int, offset int64) (io.ReadClo
 	rd := obj.NewRangeReader(ctx, offset, int64(length))
 	wrapper := &wrapReader{
 		ReadCloser: rd,
-		f:          cancel,
+		f: func() {
+			cancel()
+			be.sem.ReleaseToken()
+		},
 	}
 	return wrapper, nil
 }
@@ -177,6 +188,9 @@ func (be *b2Backend) Save(h restic.Handle, rd io.Reader) (err error) {
 	if err := h.Valid(); err != nil {
 		return err
 	}
+
+	be.sem.GetToken()
+	defer be.sem.ReleaseToken()
 
 	name := be.Filename(h)
 	debug.Log("Save %v, name %v", h, name)
@@ -207,6 +221,9 @@ func (be *b2Backend) Stat(h restic.Handle) (bi restic.FileInfo, err error) {
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
 
+	be.sem.GetToken()
+	defer be.sem.ReleaseToken()
+
 	name := be.Filename(h)
 	obj := be.bucket.Object(name)
 	info, err := obj.Attrs(ctx)
@@ -223,6 +240,9 @@ func (be *b2Backend) Test(h restic.Handle) (bool, error) {
 
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
+
+	be.sem.GetToken()
+	defer be.sem.ReleaseToken()
 
 	found := false
 	name := be.Filename(h)
@@ -241,6 +261,9 @@ func (be *b2Backend) Remove(h restic.Handle) error {
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
 
+	be.sem.GetToken()
+	defer be.sem.ReleaseToken()
+
 	obj := be.bucket.Object(be.Filename(h))
 	return errors.Wrap(obj.Delete(ctx), "Delete")
 }
@@ -254,9 +277,12 @@ func (be *b2Backend) List(t restic.FileType, done <-chan struct{}) <-chan string
 
 	ctx, cancel := context.WithCancel(context.TODO())
 
+	be.sem.GetToken()
+
 	go func() {
 		defer close(ch)
 		defer cancel()
+		defer be.sem.ReleaseToken()
 
 		prefix := be.Dirname(restic.Handle{Type: t})
 		cur := &b2.Cursor{Prefix: prefix}

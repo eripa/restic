@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"restic/errors"
+	"restic/options"
 )
 
 // Config contains all configuration necessary to connect to an b2 compatible
@@ -15,6 +16,19 @@ type Config struct {
 	Key       string
 	Bucket    string
 	Prefix    string
+
+	Connections int `option:"connections" help:"set a limit for the number of concurrent connections (default: 5)"`
+}
+
+// NewConfig returns a new config with default options applied.
+func NewConfig() Config {
+	return Config{
+		Connections: 5,
+	}
+}
+
+func init() {
+	options.Register("b2", Config{})
 }
 
 var bucketName = regexp.MustCompile("^[a-zA-Z0-9-]+$")
@@ -55,9 +69,8 @@ func ParseConfig(s string) (interface{}, error) {
 		return nil, errors.New("bucket name not found")
 	}
 
-	cfg := Config{
-		Bucket: data[0],
-	}
+	cfg := NewConfig()
+	cfg.Bucket = data[0]
 
 	if err := checkBucketName(cfg.Bucket); err != nil {
 		return nil, err
