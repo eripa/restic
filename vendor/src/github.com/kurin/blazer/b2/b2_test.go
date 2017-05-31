@@ -20,7 +20,9 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"sort"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -68,7 +70,7 @@ type testRoot struct {
 	bucketMap map[string]map[string]string
 }
 
-func (t *testRoot) authorizeAccount(context.Context, string, string) error {
+func (t *testRoot) authorizeAccount(context.Context, string, string, ...ClientOption) error {
 	t.auths++
 	return nil
 }
@@ -461,6 +463,58 @@ func TestBackoffWithoutRetryAfter(t *testing.T) {
 	}
 }
 
+type badTransport struct{}
+
+func (badTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	return &http.Response{
+		Status:     "700 What",
+		StatusCode: 700,
+		Body:       ioutil.NopCloser(bytes.NewBufferString("{}")),
+		Request:    r,
+	}, nil
+}
+
+func TestCustomTransport(t *testing.T) {
+	ctx := context.Background()
+	// Sorta fragile but...
+	_, err := NewClient(ctx, "abcd", "efgh", Transport(badTransport{}))
+	if err == nil {
+		t.Error("NewClient returned successfully, expected an error")
+	}
+	if !strings.Contains(err.Error(), "700") {
+		t.Errorf("Expected nonsense error code 700, got %v", err)
+	}
+}
+
+func TestReaderDoubleClose(t *testing.T) {
+	ctx := context.Background()
+
+	client := &Client{
+		backend: &beRoot{
+			b2i: &testRoot{
+				bucketMap: make(map[string]map[string]string),
+				errs:      &errCont{},
+			},
+		},
+	}
+	bucket, err := client.NewBucket(ctx, "bucket", &BucketAttrs{Type: Private})
+	if err != nil {
+		t.Fatal(err)
+	}
+	o, _, err := writeFile(ctx, bucket, "file", 10, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := o.NewReader(ctx)
+	// Read to EOF, and then read some more.
+	if _, err := io.Copy(ioutil.Discard, r); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := io.Copy(ioutil.Discard, r); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestReadWrite(t *testing.T) {
 	ctx := context.Background()
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -585,7 +639,7 @@ func writeFile(ctx context.Context, bucket *Bucket, name string, size int64, csi
 	h := sha1.New()
 	w := io.MultiWriter(f, h)
 	f.ConcurrentUploads = 5
-	f.csize = csize
+	f.ChunkSize = csize
 	if _, err := io.Copy(w, r); err != nil {
 		return nil, "", err
 	}
