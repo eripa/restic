@@ -23,6 +23,16 @@ type b2Backend struct {
 	sem *backend.Semaphore
 }
 
+func newClient(ctx context.Context, cfg Config) (*b2.Client, error) {
+	opts := []b2.ClientOption{b2.Transport(backend.Transport())}
+
+	c, err := b2.NewClient(ctx, cfg.AccountID, cfg.Key, opts...)
+	if err != nil {
+		return nil, errors.Wrap(err, "b2.NewClient")
+	}
+	return c, nil
+}
+
 // Open opens a connection to the B2 service.
 func Open(cfg Config) (restic.Backend, error) {
 	debug.Log("cfg %#v", cfg)
@@ -30,14 +40,14 @@ func Open(cfg Config) (restic.Backend, error) {
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
 
-	client, err := b2.NewClient(ctx, cfg.AccountID, cfg.Key)
+	client, err := newClient(ctx, cfg)
 	if err != nil {
-		return nil, errors.Wrap(err, "b2.NewClient")
+		return nil, err
 	}
 
 	bucket, err := client.Bucket(ctx, cfg.Bucket)
 	if err != nil {
-		return nil, errors.Wrap(err, "NewBucket")
+		return nil, errors.Wrap(err, "Bucket")
 	}
 
 	be := &b2Backend{
@@ -62,9 +72,9 @@ func Create(cfg Config) (restic.Backend, error) {
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
 
-	client, err := b2.NewClient(ctx, cfg.AccountID, cfg.Key)
+	client, err := newClient(ctx, cfg)
 	if err != nil {
-		return nil, errors.Wrap(err, "b2.NewClient")
+		return nil, err
 	}
 
 	attr := b2.BucketAttrs{
